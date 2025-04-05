@@ -124,7 +124,7 @@ def handle_message(event):
 
         if result or message_text == "ギブアップ":
             # 正解またはギブアップ時
-            reply_text = f"{'正解！' if result else '残念！'}\n{question['解説']}\n正答率: {question['正答率']}\nテーマ: {question['テーマ']}\n続けますか？"
+            reply_text = f"{'正解！' if result else '残念！'}\n{question['解説']}\n正答率: {question['正答率']}\nテーマ: {question['テーマ']}\n続けますか？[はい/いいえ]"
             user_states[user_id]["step"] = "waiting_confirmation"
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         else:
@@ -135,7 +135,7 @@ def handle_message(event):
         log_answer(user_id, state["question_id"], message_text, correct_answer, result)
 
     elif state["step"] == "waiting_confirmation":
-        if message_text == "終了":
+        if message_text == "いいえ":
             user_states[user_id] = {"step": "waiting_question"}
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="終了します"))
         else:

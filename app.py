@@ -1,7 +1,7 @@
 import os
 import csv
 import unicodedata
-import psycopg2
+import requests
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
@@ -16,8 +16,8 @@ LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
-# PostgreSQL 接続情報（環境変数から取得）
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Google Apps Scriptのエンドポイント
+SCORE_SHEET_URL = os.getenv("SCORE_SHEET_URL")
 
 # ユーザーの状態を管理する辞書
 user_states = {}
@@ -30,41 +30,20 @@ with open("quiz.csv", "r", encoding="utf-8-sig") as f:
         questions[row["問題ID"].upper()] = row  # 大文字に統一
 
 
-def create_table():
-    """ユーザーの回答を記録するためのテーブルを作成"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
-
-    cur.execute("""
-    CREATE TABLE IF NOT EXISTS user_answers (
-        id SERIAL PRIMARY KEY,
-        user_id TEXT NOT NULL,
-        question_id TEXT NOT NULL,
-        user_answer TEXT NOT NULL,
-        correct_answer TEXT NOT NULL,
-        result BOOLEAN NOT NULL,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    );
-    """)
-
-    conn.commit()
-    cur.close()
-    conn.close()
-
-
 def log_answer(user_id, question_id, user_answer, correct_answer, result):
     """ユーザーの解答をデータベースに記録"""
-    conn = psycopg2.connect(DATABASE_URL)
-    cur = conn.cursor()
+    data = {
+        "userId": user_id,
+        "questionId": question_id,
+        "userAnswer": user_answer,
+        "correctAnswer": correct_answer,
+        "result": result
+    }
 
-    cur.execute("""
-    INSERT INTO user_answers (user_id, question_id, user_answer, correct_answer, result)
-    VALUES (%s, %s, %s, %s, %s);
-    """, (user_id, question_id, user_answer, correct_answer, result))
-
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        requests.post(SCORE_SHEET_URL, json=data)
+    except Exception as e:
+        print(f"GAS送信エラー: {e}")
 
 
 @app.route("/")
@@ -175,5 +154,5 @@ def handle_message(event):
 
 
 if __name__ == "__main__":
-    create_table()  # アプリ起動時にテーブルを作成
-    app.run(host="0.0.0.0", port=10000, debug=True)
+    port = int(os.getenv("PORT", 10000))
+    app.run(host="0.0.0.0", port=port, debug=True)

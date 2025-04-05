@@ -97,20 +97,21 @@ def send_question(user_id, question_id, reply_token):
 def handle_message(event):
     """ ユーザーのメッセージを処理する """
     user_id = event.source.user_id
-    message_text = event.message.text.strip().upper()  # 大文字に統一
+    message_text = event.message.text.strip()
 
     # ユーザーの状態を取得（デフォルトは通常モード）
     state = user_states.get(user_id, {"step": "waiting_question"})
 
     if state["step"] == "waiting_question":
         # ① 問題番号待ち
-        if message_text in questions:
+        question_id = message_text.upper()
+        if question_id in questions:
             # 問題開始
             user_states[user_id] = {
                 "step": "waiting_answer",
-                "question_id": message_text
+                "question_id": question_id
             }
-            send_question(user_id, message_text, event.reply_token)
+            send_question(user_id, question_id, event.reply_token)
         else:
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="問題番号を入力してください"))
 

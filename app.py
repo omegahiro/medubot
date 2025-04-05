@@ -47,7 +47,7 @@ def log_answer(user_id, question_id, user_answer, correct_answer, result):
     data = {
         "sheetName": "history",
         "userId": user_id,
-        "questionId": question_id,
+        "questionId": "'" + question_id,
         "userAnswer": user_answer,
         "correctAnswer": correct_answer,
         "result": result

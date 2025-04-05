@@ -38,7 +38,7 @@ def fetch_questions():
 
 
 # 問題リストの取得
-questions = fetch_questions()
+questions = {question["問題ID"]: question for question in fetch_questions()}
 print(f"Fetched {len(questions)} questions")
 
 

@@ -1,5 +1,4 @@
 import os
-import csv
 import unicodedata
 import requests
 from flask import Flask, request, abort
@@ -17,17 +16,30 @@ line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 handler = WebhookHandler(LINE_CHANNEL_SECRET)
 
 # Google Apps Scriptのエンドポイント
-SCORE_SHEET_URL = os.getenv("SCORE_SHEET_URL")
+GAS_DB_URL = os.getenv("GAS_DB_URL")
 
 # ユーザーの状態を管理する辞書
 user_states = {}
 
-# 問題リストの読み込み
-questions = {}
-with open("quiz.csv", "r", encoding="utf-8-sig") as f:
-    reader = csv.DictReader(f)
-    for row in reader:
-        questions[row["問題ID"].upper()] = row  # 大文字に統一
+
+# GASから問題リストを取得
+def fetch_questions():
+    """Google Apps Scriptから問題リストを取得"""
+    params = {
+        "sheetName": "questions"
+    }
+    try:
+        response = requests.get(GAS_DB_URL, params=params)
+        response.raise_for_status()  # Raise HTTPError if not 200 OK
+        return response.json()
+    except requests.RequestException as e:
+        print(f"Error fetching questions: {e}")
+        return {}
+
+
+# 問題リストの取得
+questions = fetch_questions()
+print(f"Fetched {len(questions)} questions")
 
 
 def log_answer(user_id, question_id, user_answer, correct_answer, result):
@@ -41,7 +53,7 @@ def log_answer(user_id, question_id, user_answer, correct_answer, result):
     }
 
     try:
-        requests.post(SCORE_SHEET_URL, json=data)
+        requests.post(GAS_DB_URL, json=data)
     except Exception as e:
         print(f"GAS送信エラー: {e}")
 

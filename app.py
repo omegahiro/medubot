@@ -45,6 +45,7 @@ print(f"Fetched {len(questions)} questions")
 def log_answer(user_id, question_id, user_answer, correct_answer, result):
     """ユーザーの解答をデータベースに記録"""
     data = {
+        "sheetName": "history",
         "userId": user_id,
         "questionId": question_id,
         "userAnswer": user_answer,

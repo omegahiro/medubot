@@ -152,7 +152,7 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"{message_text}を出題します\n最初の問題番号を入力してください"))
 
         else:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="問題番号かカテゴリを入力してください\nカテゴリ: " + ", ".join(categories) + ", すべて"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="問題番号かカテゴリを入力してください\n" + ", ".join(categories) + ", すべて"))
 
     elif state["step"] == "waiting_answer":
         # ② ユーザー回答待ち
@@ -176,7 +176,7 @@ def handle_message(event):
     elif state["step"] == "waiting_confirmation":
         if message_text == "いいえ":
             user_states[user_id].update({"step": "waiting_question", "category": None})
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="終了します\nカテゴリフィルターをリセットします"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="終了します\nカテゴリフィルターをリセットします" if state["category"] else "終了します"))
         else:
             # 現在の問題IDのインデックスを取得
             question_ids = list(questions.keys())
@@ -186,7 +186,7 @@ def handle_message(event):
             remaining_questions = question_ids[current_index + 1:] if current_index != -1 else []
 
             # カテゴリが指定されてるなら、remaining_questionsをフィルタリング
-            filtered_questions = [q for q in remaining_questions if questions[q]["カテゴリ"] == state["category"]] if state["category"] is not None else remaining_questions
+            filtered_questions = remaining_questions if state["category"] is None else [q for q in remaining_questions if questions[q]["カテゴリ"] == state["category"]]
 
             # 問題が残っているか確認
             if filtered_questions:
@@ -194,7 +194,7 @@ def handle_message(event):
                 send_question(user_id, next_question_id, event.reply_token)
             else:
                 # 残っている問題がない場合
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="これが最後の問題です\nカテゴリフィルターをリセットします"))
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="これが最後の問題です\nカテゴリフィルターをリセットします" if state["category"] else "これが最後の問題です"))
                 user_states[user_id].update({"step": "waiting_question", "category": None})
 
 

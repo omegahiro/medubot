@@ -6,6 +6,8 @@ from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageSendMessage
 
+from pattern import get_random_taunt
+
 app = Flask(__name__)
 
 # 環境変数からLINE APIの認証情報を取得
@@ -168,7 +170,7 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         else:
             # 不正解時
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="違います"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=get_random_taunt()))
 
         # 解答結果記録
         log_answer(user_id, state["question_id"], message_text, correct_answer, result)

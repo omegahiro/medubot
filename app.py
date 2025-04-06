@@ -37,9 +37,20 @@ def fetch_questions():
         return {}
 
 
-# 問題リストの取得
-questions = {question["問題ID"]: question for question in fetch_questions()}
-print(f"Fetched {len(questions)} questions")
+def build_questions_and_categories():
+    """問題リストとカテゴリリストを構築"""
+    question_list = fetch_questions()
+    questions_ = {question["問題ID"]: question for question in question_list}
+    categories_ = set()
+
+    for question in questions_.values():
+        categories_.add(question["カテゴリ"])
+
+    return questions_, categories_
+
+
+# 問題リストとカテゴリリストを取得
+questions, categories = build_questions_and_categories()
 
 
 def log_answer(user_id, question_id, user_answer, correct_answer, result):
@@ -120,13 +131,21 @@ def handle_message(event):
         question_id = message_text.upper()
         if question_id in questions:
             # 問題開始
-            user_states[user_id] = {
+            user_states[user_id].update({
                 "step": "waiting_answer",
-                "question_id": question_id
-            }
+                "question_id": question_id,
+            })
             send_question(user_id, question_id, event.reply_token)
+
+        # もしカテゴリ名が入力された場合、そのカテゴリに絞って問題を出題するためにuser_statesを更新
+        elif (message_text in categories) or (message_text == "すべて"):
+            user_states[user_id].update({
+                "category": message_text if message_text != "すべて" else "all"
+            })
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"{message_text}を出題します\n最初の問題番号を入力してください"))
+
         else:
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="問題番号を入力してください"))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="問題番号かカテゴリを入力してください\nカテゴリ: " + ", ".join(categories) + ", すべて"))
 
     elif state["step"] == "waiting_answer":
         # ② ユーザー回答待ち
@@ -137,8 +156,8 @@ def handle_message(event):
 
         if result or message_text == "ギブアップ":
             # 正解またはギブアップ時
-            reply_text = f"{'正解！' if result else '残念！'}\n{question['解説']}\n正答率: {question['正答率']}\nテーマ: {question['テーマ']}\n続けますか？ [はい/いいえ]"
-            user_states[user_id]["step"] = "waiting_confirmation"
+            reply_text = f"{'正解！' if result else '残念！'}\n{question['解説']}\n正答率: {question['正答率']}\nテーマ: {question['テーマ']}\nカテゴリ: {question['カテゴリ']}\n続けますか？ [はい/いいえ]"
+            user_states[user_id].update({"step": "waiting_confirmation"})
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         else:
             # 不正解時
@@ -149,22 +168,27 @@ def handle_message(event):
 
     elif state["step"] == "waiting_confirmation":
         if message_text == "いいえ":
-            user_states[user_id] = {"step": "waiting_question"}
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="終了します"))
+            user_states[user_id].update({"step": "waiting_question", "category": "all"})
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text="終了します\nカテゴリフィルターをリセットします"))
         else:
-            # 次の問題へ
+            # 現在の問題IDのインデックスを取得
             question_ids = list(questions.keys())
             current_index = question_ids.index(state["question_id"]) if state["question_id"] in question_ids else -1
-            if current_index + 1 < len(question_ids):
-                next_question = question_ids[current_index + 1]
-                user_states[user_id] = {
-                    "step": "waiting_answer",
-                    "question_id": next_question
-                }
-                send_question(user_id, next_question, event.reply_token)
+
+            # 現在のインデックスより後ろの問題をフィルタリング
+            remaining_questions = question_ids[current_index + 1:] if current_index != -1 else []
+
+            # カテゴリが指定されてるなら、remaining_questionsをフィルタリング
+            filtered_questions = [q for q in remaining_questions if questions[q]["カテゴリ"] == state["category"]] if state["category"] != "all" else remaining_questions
+
+            # 問題が残っているか確認
+            if filtered_questions:
+                next_question_id = filtered_questions[0]
+                send_question(user_id, next_question_id, event.reply_token)
             else:
-                user_states[user_id] = {"step": "waiting_question"}
-                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="これが最後の問題です"))
+                # 残っている問題がない場合
+                line_bot_api.reply_message(event.reply_token, TextSendMessage(text="これが最後の問題です\nカテゴリフィルターをリセットします"))
+                user_states[user_id].update({"step": "waiting_question", "category": "all"})
 
 
 if __name__ == "__main__":

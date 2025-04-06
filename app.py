@@ -123,8 +123,15 @@ def handle_message(event):
     user_id = event.source.user_id
     message_text = event.message.text.strip()
 
-    # ユーザーの状態を取得（デフォルトは通常モード）
-    state = user_states.get(user_id, {"step": "waiting_question"})
+    # ユーザーの状態を取得
+    state = user_states.get(user_id)
+    if state is None:
+        # 初回メッセージの場合、ユーザーの状態を初期化
+        user_states[user_id] = {
+            "step": "waiting_question",
+            "category": None
+        }
+        state = user_states[user_id]
 
     if state["step"] == "waiting_question":
         # ① 問題番号待ち
@@ -140,7 +147,7 @@ def handle_message(event):
         # もしカテゴリ名が入力された場合、そのカテゴリに絞って問題を出題するためにuser_statesを更新
         elif (message_text in categories) or (message_text == "すべて"):
             user_states[user_id].update({
-                "category": message_text if message_text != "すべて" else "all"
+                "category": message_text if message_text != "すべて" else None
             })
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=f"{message_text}を出題します\n最初の問題番号を入力してください"))
 
@@ -168,7 +175,7 @@ def handle_message(event):
 
     elif state["step"] == "waiting_confirmation":
         if message_text == "いいえ":
-            user_states[user_id].update({"step": "waiting_question", "category": "all"})
+            user_states[user_id].update({"step": "waiting_question", "category": None})
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="終了します\nカテゴリフィルターをリセットします"))
         else:
             # 現在の問題IDのインデックスを取得
@@ -179,7 +186,7 @@ def handle_message(event):
             remaining_questions = question_ids[current_index + 1:] if current_index != -1 else []
 
             # カテゴリが指定されてるなら、remaining_questionsをフィルタリング
-            filtered_questions = [q for q in remaining_questions if questions[q]["カテゴリ"] == state["category"]] if state["category"] != "all" else remaining_questions
+            filtered_questions = [q for q in remaining_questions if questions[q]["カテゴリ"] == state["category"]] if state["category"] is not None else remaining_questions
 
             # 問題が残っているか確認
             if filtered_questions:
@@ -188,7 +195,7 @@ def handle_message(event):
             else:
                 # 残っている問題がない場合
                 line_bot_api.reply_message(event.reply_token, TextSendMessage(text="これが最後の問題です\nカテゴリフィルターをリセットします"))
-                user_states[user_id].update({"step": "waiting_question", "category": "all"})
+                user_states[user_id].update({"step": "waiting_question", "category": None})
 
 
 if __name__ == "__main__":

@@ -1,12 +1,11 @@
 import os
+import random
 import unicodedata
 import requests
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
 from linebot.models import MessageEvent, TextMessage, TextSendMessage, ImageSendMessage
-
-from pattern import get_random_taunt
 
 app = Flask(__name__)
 
@@ -53,6 +52,23 @@ def build_questions_and_categories():
 
 # 問題リストとカテゴリリストを取得
 questions, categories = build_questions_and_categories()
+
+
+def fetch_taunting_responses():
+    """Google Apps Scriptからあおりメッセージを取得"""
+    params = {
+        "sheetName": "Taunting"
+    }
+    try:
+        response = requests.get(GAS_DB_URL, params=params)
+        response.raise_for_status()  # Raise HTTPError if not 200 OK
+        return [item["sentence"] for item in response.json()]
+    except requests.RequestException as e:
+        print(f"Error fetching taunting responses: {e}")
+        return []
+
+# あおりメッセージを取得
+taunting_responses = fetch_taunting_responses()
 
 
 def log_answer(user_id, question_id, user_answer, correct_answer, result):
@@ -170,7 +186,7 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         else:
             # 不正解時
-            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=get_random_taunt()))
+            line_bot_api.reply_message(event.reply_token, TextSendMessage(text=random.choice(taunting_responses)))
 
         # 解答結果記録
         log_answer(user_id, state["question_id"], message_text, correct_answer, result)

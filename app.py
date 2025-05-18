@@ -2,6 +2,7 @@ import os
 import random
 import unicodedata
 import requests
+import time
 from flask import Flask, request, abort
 from linebot import LineBotApi, WebhookHandler
 from linebot.exceptions import InvalidSignatureError
@@ -71,7 +72,7 @@ def fetch_taunting_responses():
 taunting_responses = fetch_taunting_responses()
 
 
-def log_answer(user_id, question_id, user_answer, correct_answer, result):
+def log_answer(user_id, question_id, user_answer, correct_answer, result, elapsed_time):
     """ユーザーの解答をデータベースに記録"""
     data = {
         "sheetName": "history",
@@ -79,7 +80,8 @@ def log_answer(user_id, question_id, user_answer, correct_answer, result):
         "questionId": "'" + question_id,
         "userAnswer": user_answer,
         "correctAnswer": correct_answer,
-        "result": result
+        "result": result,
+        "elapsedTime": round(elapsed_time, 1)
     }
 
     try:
@@ -129,7 +131,7 @@ def send_question(user_id, question_id, reply_token):
             messages.append(ImageSendMessage(original_content_url=image_url, preview_image_url=image_url))
 
     # ユーザーの状態を更新
-    user_states[user_id].update({"question_id": question_id, "step": "waiting_answer"})
+    user_states[user_id].update({"question_id": question_id, "step": "waiting_answer", "start_time": time.time()})
 
     # LINEに送信
     line_bot_api.reply_message(reply_token, messages)
@@ -178,10 +180,11 @@ def handle_message(event):
         correct_answer = normalize_answer(question["正解"])
         user_answer = normalize_answer(message_text)
         result = user_answer == correct_answer
+        elapsed_time = time.time() - state.get("start_time", time.time())
 
         if result or message_text == "ギブアップ":
             # 正解またはギブアップ時
-            reply_text = f"{'正解！' if result else '残念！'}\n{question['解説']}\n正答率: {question['正答率']}\nテーマ: {question['テーマ']}\nカテゴリ: {question['カテゴリ']}\n続けますか？ [はい/いいえ]"
+            reply_text = f"{'正解！' if result else '残念！'}\n所要時間: {elapsed_time:.1f}秒\n{question['解説']}\n正答率: {question['正答率']}\nテーマ: {question['テーマ']}\nカテゴリ: {question['カテゴリ']}\n続けますか？ [はい/いいえ]"
             user_states[user_id].update({"step": "waiting_confirmation"})
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         else:
@@ -189,7 +192,7 @@ def handle_message(event):
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=random.choice(taunting_responses)))
 
         # 解答結果記録
-        log_answer(user_id, state["question_id"], message_text, correct_answer, result)
+        log_answer(user_id, state["question_id"], message_text, correct_answer, result, elapsed_time)
 
     elif state["step"] == "waiting_confirmation":
         if message_text == "いいえ":

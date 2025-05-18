@@ -81,7 +81,7 @@ def log_answer(user_id, question_id, user_answer, correct_answer, result, elapse
         "userAnswer": user_answer,
         "correctAnswer": correct_answer,
         "result": result,
-        "elapsedTime": round(elapsed_time, 1)
+        "elapsedTime": round(elapsed_time)
     }
 
     try:
@@ -184,7 +184,7 @@ def handle_message(event):
 
         if result or message_text == "ギブアップ":
             # 正解またはギブアップ時
-            reply_text = f"{'正解！' if result else '残念！'}\n所要時間: {elapsed_time:.1f}秒\n{question['解説']}\n正答率: {question['正答率']}\nテーマ: {question['テーマ']}\nカテゴリ: {question['カテゴリ']}\n続けますか？ [はい/いいえ]"
+            reply_text = f"{'正解！' if result else '残念！'}\n回答時間: {round(elapsed_time)}秒\n{question['解説']}\n正答率: {question['正答率']}\nテーマ: {question['テーマ']}\nカテゴリ: {question['カテゴリ']}\n続けますか？ [はい/いいえ]"
             user_states[user_id].update({"step": "waiting_confirmation"})
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text=reply_text))
         else:

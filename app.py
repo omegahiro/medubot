@@ -198,6 +198,15 @@ def handle_message(event):
         if message_text == "いいえ":
             user_states[user_id].update({"step": "waiting_question", "category": None})
             line_bot_api.reply_message(event.reply_token, TextSendMessage(text="終了します\nカテゴリフィルターをリセットします" if state["category"] else "終了します"))
+
+        elif message_text.upper() in questions:
+            # 問題番号が入力された場合
+            user_states[user_id].update({
+                "step": "waiting_answer",
+                "question_id": message_text.upper(),
+            })
+            send_question(user_id, message_text.upper(), event.reply_token)
+            
         else:
             # 現在の問題IDのインデックスを取得
             question_ids = list(questions.keys())
